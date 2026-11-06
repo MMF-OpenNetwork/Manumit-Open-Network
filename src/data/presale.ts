@@ -180,10 +180,10 @@ const SEPOLIA: NetworkConfig = {
     },
     {
       id: "usdc",
-      label: "USDC",
+      label: "tUSDC",
       chain: "Sepolia",
       decimals: 6,
-      address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      address: "0x90d9099d530B38765e1cC734a4783e4ADAFB01e8",
       available: true,
     },
     {
