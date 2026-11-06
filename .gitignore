@@ -1,17 +1,12 @@
-# Dependencies
 node_modules/
-vendor/
-
-# Environment variables and secrets
-.env
-.env.*
-!.env.example
-
-# Build outputs
+.next/
+out/
 dist/
 build/
-out/
-
-# Logs
+artifacts/
+cache/
+typechain-types/
+coverage/
+.env
+.env.*
 *.log
-logs/

@@ -25,8 +25,6 @@ export interface PresaleStats {
   /** Price of the following round, or null while in the final round. */
   nextPriceUsd: number | null;
   /** Wei of ETH per whole MMC. */
-  currentPriceWei: bigint;
-  currentPriceEth: number;
   tokensSold: number;
   tokensRemaining: number;
   progressPct: number;
@@ -37,7 +35,6 @@ export interface PresaleStats {
 }
 
 /**
- * currentPrice() and currentNativePrice() revert with "Presale inactive"
  * outside a round window, so the round schedule in src/data/presale.ts is
  * used to decide which price to display until the sale opens. Everything
  * else (sold, remaining, paused, soldOut) reads fine at any time.
@@ -57,7 +54,6 @@ export function usePresaleStats() {
 
   const roundQuery = useReadContract({ ...read, functionName: "currentRound" });
   const priceQuery = useReadContract({ ...read, functionName: "currentPrice" });
-  const nativePriceQuery = useReadContract({ ...read, functionName: "currentNativePrice" });
   const soldQuery = useReadContract({ ...read, functionName: "totalSold" });
   const remainingQuery = useReadContract({ ...read, functionName: "remaining" });
   const pausedQuery = useReadContract({ ...read, functionName: "paused" });
@@ -91,15 +87,6 @@ export function usePresaleStats() {
     BigInt(Math.round(scheduled.priceUsd * 10 ** USD_PRICE_DECIMALS));
   const currentPriceUsd = Number(formatUnits(currentPriceUsdRaw, USD_PRICE_DECIMALS));
 
-  // The Sepolia contract derives its native price from a live oracle feed, so
-  // there is no static fallback to advertise before that feed is configured.
-  const onChainWei = nativePriceQuery.data as bigint | undefined;
-  const currentPriceWei =
-    onChainWei ??
-    (scheduled.priceEth
-      ? BigInt(Math.round(scheduled.priceEth * 1e18))
-      : 0n);
-
   // Derived from whichever round is actually current, so "next price" goes
   // blank once the final round is running instead of pointing back at round 2.
   const nextRound = PRESALE_ROUNDS[PRESALE_ROUNDS.indexOf(scheduled) + 1];
@@ -121,8 +108,6 @@ export function usePresaleStats() {
     currentPriceUsd,
     currentPriceUsdRaw,
     nextPriceUsd,
-    currentPriceWei,
-    currentPriceEth: Number(formatUnits(currentPriceWei, 18)),
     tokensSold,
     tokensRemaining,
     progressPct: Math.min(100, (tokensSold / PRESALE_TOKEN.presaleAllocation) * 100),
