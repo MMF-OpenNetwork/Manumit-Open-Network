@@ -1,13 +1,29 @@
+# Dependencies
 node_modules/
+
+# Next.js
 .next/
 out/
+
+# Build files
 dist/
 build/
+
+# Blockchain / Smart Contract
 artifacts/
 cache/
 typechain-types/
+
+# Testing
 coverage/
+
+# Environment variables
 .env
 .env.*
+!.env.example
+
+# Logs
 *.log
+
+# Orders
 .orders.json
