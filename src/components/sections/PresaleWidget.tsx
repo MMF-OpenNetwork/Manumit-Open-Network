@@ -19,7 +19,6 @@ import { SectionReveal } from "@/components/ui/SectionReveal";
 import {
   EXPLORER_NAME,
   EXPLORER_URL,
-  OFFCHAIN_PAYMENT_URL,
   PAYMENT_METHODS,
   PRESALE_CONTRACT_ADDRESS,
   PRESALE_TOKEN,
@@ -90,6 +89,19 @@ const ONE_TOKEN = 10n ** 18n;
 const USD_DECIMALS = 6; // contract prices: 100_000 = $0.10
 const SLIPPAGE_NUM = 995n; // accept at least 99.5% of the quoted MMC
 const SLIPPAGE_DEN = 1000n;
+const MIN_CHECKOUT_USD = 10; // keep equal to MIN_USD_CENTS in the invoice route
+
+// One checkout for BTC, ETH, USDT, USDC and many other coins. The buyer picks
+// the coin on the hosted NOWPayments page; the server credits MMC afterwards.
+const CRYPTO_CHECKOUT_METHOD = {
+  id: "crypto-checkout",
+  label: "BTC / ETH / Stablecoins",
+  decimals: 0,
+  chain: "Any network",
+  available: true,
+  offchain: true,
+  note: "Many more coins",
+} as PaymentMethod;
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -186,17 +198,27 @@ export function PresaleWidget() {
   const shouldReduceMotion = useReducedMotion();
 
   const [amount, setAmount] = useState("");
-  const [methodId, setMethodId] = useState(
-    () => PAYMENT_METHODS.find((m) => !m.native && m.available)?.id ?? PAYMENT_METHODS[0].id,
-  );
+  const [methodId, setMethodId] = useState(CRYPTO_CHECKOUT_METHOD.id);
   const [message, setMessage] = useState("");
   const [lastAction, setLastAction] = useState<"approve" | "buy" | null>(null);
   const [mountedAt] = useState(() => Date.now());
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [returnedFromCheckout, setReturnedFromCheckout] = useState(false);
+
+  // The checkout sends the buyer back to /presale?paid=1
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("paid") === "1") {
+      setReturnedFromCheckout(true);
+    }
+  }, []);
 
   const wrongNetwork = isConnected && chainId !== activeChain.id;
 
   // The contract has no native-ETH purchase path, so native methods are dropped.
-  const methods = useMemo(() => PAYMENT_METHODS.filter((m) => !m.native), []);
+  const methods = useMemo(
+    () => [...PAYMENT_METHODS.filter((m) => !m.native && !m.offchain), CRYPTO_CHECKOUT_METHOD],
+    [],
+  );
   const method = methods.find((m) => m.id === methodId) ?? methods[0];
   const isOffchain = Boolean(method.offchain);
 
@@ -314,7 +336,7 @@ export function PresaleWidget() {
   }, [erc20Methods, acceptedReads]);
 
   const isMethodEnabled = (m: PaymentMethod) => {
-    if (m.offchain) return Boolean(OFFCHAIN_PAYMENT_URL);
+    if (m.offchain) return true;
     return acceptedByAddress.get((m.address ?? "").toLowerCase()) === true;
   };
 
@@ -411,6 +433,9 @@ export function PresaleWidget() {
         ? `Purchase confirmed. Your ${PRESALE_TOKEN.symbol} is in your wallet and locked until ${dateFmt.format(unlockMs)}.`
         : `Purchase confirmed. Your ${PRESALE_TOKEN.symbol} is in your wallet.`;
     }
+    if (returnedFromCheckout && !message && !writeError) {
+      return "Thank you! Your payment is being confirmed. Your MMC arrives in your wallet once the network confirms it, which can take a few minutes.";
+    }
     if (writeError) {
       const e = writeError as { shortMessage?: string; message: string };
       return e.shortMessage ?? e.message;
@@ -428,7 +453,7 @@ export function PresaleWidget() {
     }
   };
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     setMessage("");
     if (!isConnected) {
       openConnectModal?.();
@@ -443,18 +468,41 @@ export function PresaleWidget() {
       return;
     }
 
-    // Off-chain payments are credited by an authorised processor after checkout.
+    // Crypto checkout (NOWPayments). The server recomputes the price from the
+    // contract, then the buyer picks BTC, ETH, a stablecoin, etc. on the hosted page.
     if (isOffchain) {
-      if (!OFFCHAIN_PAYMENT_URL) {
-        setMessage("Off-chain checkout opens with the sale. Check back soon.");
+      if (!isLive) {
+        setMessage("The presale is not open right now.");
         return;
       }
-      const url = new URL(OFFCHAIN_PAYMENT_URL);
-      if (address) url.searchParams.set("wallet", address);
-      // Informational only. The checkout backend must recompute the price itself.
-      url.searchParams.set("mmc", amount);
-      url.searchParams.set("usd", usdValue.toFixed(2));
-      window.open(url.toString(), "_blank", "noopener,noreferrer");
+      if (overLimit) {
+        setMessage(
+          `Only ${formatCompact(toNum(maxBuyable))} ${PRESALE_TOKEN.symbol} left in this round.`,
+        );
+        return;
+      }
+      if (usdValue < MIN_CHECKOUT_USD) {
+        setMessage(`The minimum purchase is ${formatUsd(MIN_CHECKOUT_USD)}.`);
+        return;
+      }
+      setCheckingOut(true);
+      try {
+        const res = await fetch("/api/nowpayments/invoice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet: address, mmc: amount }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) {
+          setMessage(data.error ?? "Could not start checkout. Please try again.");
+          setCheckingOut(false);
+          return;
+        }
+        window.location.href = data.url;
+      } catch {
+        setMessage("Network error. Please try again.");
+        setCheckingOut(false);
+      }
       return;
     }
 
@@ -503,9 +551,18 @@ export function PresaleWidget() {
   const buttonLabel = (() => {
     if (!isConnected) return "Connect Wallet to Purchase";
     if (wrongNetwork) return `Switch to ${activeChain.name}`;
+    if (checkingOut) return "Opening checkout…";
     if (busy) return isConfirming ? "Confirming…" : "Check your wallet…";
     if (isOffchain) {
-      return OFFCHAIN_PAYMENT_URL ? `Pay with ${method.label}` : `${method.label} opening soon`;
+      if (isSoldOut) return "Sold Out";
+      if (isPaused) return "Sale Paused";
+      if (notStarted) return `Opens ${dateFmt.format(round1Start)}`;
+      if (ended) return "Sale Closed";
+      if (!isLive) return "Between rounds";
+      if (mmcBase > 0n && usdValue < MIN_CHECKOUT_USD) {
+        return `Minimum ${formatUsd(MIN_CHECKOUT_USD)}`;
+      }
+      return "Pay with Crypto";
     }
     if (isSoldOut) return "Sold Out";
     if (isPaused) return "Sale Paused";
@@ -524,7 +581,12 @@ export function PresaleWidget() {
     !isConnected ||
     wrongNetwork ||
     (isOffchain
-      ? Boolean(OFFCHAIN_PAYMENT_URL) && mmcBase > 0n && !busy
+      ? isLive &&
+        !isSoldOut &&
+        mmcBase > 0n &&
+        usdValue >= MIN_CHECKOUT_USD &&
+        !overLimit &&
+        !checkingOut
       : isLive &&
         !isSoldOut &&
         (!configLoaded || configured) &&
@@ -697,12 +759,6 @@ export function PresaleWidget() {
                     );
                   })}
                 </div>
-                {!anyOnchainEnabled && (
-                  <p className="mt-2.5 text-[11px] text-white/45 leading-relaxed">
-                    No payment token is registered on this deployment yet. The owner enables one with
-                    setPaymentToken(token, true, priceFeed).
-                  </p>
-                )}
               </div>
 
               {/* Buy input */}
@@ -744,9 +800,7 @@ export function PresaleWidget() {
 
                 {isOffchain && (
                   <p className="text-white/50 text-xs leading-relaxed">
-                    {OFFCHAIN_PAYMENT_URL
-                      ? `You'll be taken to a secure checkout. Your ${PRESALE_TOKEN.symbol} is credited to your connected wallet once the payment is confirmed.`
-                      : "Off-chain payments open with the sale."}
+                    {`You'll be taken to a secure checkout where you choose BTC, ETH, USDT, USDC or another coin. Your ${PRESALE_TOKEN.symbol} is credited to your connected wallet once the payment is confirmed. Minimum purchase ${formatUsd(MIN_CHECKOUT_USD)}.`}
                   </p>
                 )}
 
