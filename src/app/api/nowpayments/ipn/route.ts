@@ -87,8 +87,8 @@ export async function POST(req: Request) {
   //     Repeated deposits, wrong-asset deposits and big shortfalls are never
   //     credited automatically.
   const payAmount = Number(body.pay_amount);
-  const received = Number(body.actually_paid);
-  const ratio = payAmount > 0 ? received / payAmount : 0;
+  const paidAmount = Number(body.actually_paid);
+  const ratio = payAmount > 0 ? paidAmount / payAmount : 0;
   if (body.parent_payment_id || body.price_currency !== "usd" || !(ratio >= MIN_PAID_RATIO)) {
     console.warn("IPN flagged for manual review", body.payment_id, body.order_id);
     return NextResponse.json({ ok: true, flagged: true });
