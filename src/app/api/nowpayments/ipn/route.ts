@@ -12,7 +12,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains"; // change to your chain
 import { db } from "@/server/db"; // YOUR database helper (see notes)
 
+// Allow time for the blockchain transaction (check your hosting plan's limit).
+export const maxDuration = 60;
+
 const PRESALE = process.env.PRESALE_ADDRESS as `0x${string}`;
+
+// If at least this share of the requested amount arrived, credit MMC in
+// proportion to what arrived. Below it, the order goes to manual review.
+const MIN_PAID_RATIO = 0.9;
 
 const abi = parseAbi([
   "function roundAt(uint256 timestamp) view returns (uint256)",
@@ -75,21 +82,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Amount mismatch" }, { status: 409 });
   }
 
-  // 3b) Per the NOWPayments docs, repeated deposits (parent_payment_id set),
-  //     wrong-asset deposits and underpayments can also arrive as "finished".
-  //     Never credit those automatically. They are logged and checked by hand.
-  const underpaid = Number(body.actually_paid) < Number(body.pay_amount);
-  if (body.parent_payment_id || body.price_currency !== "usd" || underpaid) {
+  // 3b) Credit what actually arrived. A small shortfall is common when the buyer
+  //     pays from an exchange (the withdrawal fee comes out of the amount).
+  //     Repeated deposits, wrong-asset deposits and big shortfalls are never
+  //     credited automatically.
+  const payAmount = Number(body.pay_amount);
+  const received = Number(body.actually_paid);
+  const ratio = payAmount > 0 ? received / payAmount : 0;
+  if (body.parent_payment_id || body.price_currency !== "usd" || !(ratio >= MIN_PAID_RATIO)) {
     console.warn("IPN flagged for manual review", body.payment_id, body.order_id);
     return NextResponse.json({ ok: true, flagged: true });
   }
+  const creditRatio = Math.min(ratio, 1); // never credit more than the order
 
   // 4) Claim the order atomically so two webhook retries can't both credit it.
   const claimed = await db.orders.claim(order.id, "pending", "processing");
   if (!claimed) return NextResponse.json({ ok: true, inProgress: true });
 
   try {
-    const usd6 = BigInt(order.usd6);
+    // Order amount scaled by the share that actually arrived (rounded down).
+    const usd6 = BigInt(Math.floor(Number(order.usd6) * creditRatio));
+    if (usd6 <= 0n) throw new Error("Nothing to credit");
     const paidAt = BigInt(order.createdAt); // price/round locked when the invoice was made
     // Based on the ORDER, not the payment, so even a second payment for the
     // same order can never be credited twice on-chain.
@@ -115,6 +128,7 @@ export async function POST(req: Request) {
     });
     await publicClient.waitForTransactionReceipt({ hash });
 
+    console.log("Credited order", order.id, "usd6", usd6.toString(), "ratio", creditRatio);
     await db.orders.update(order.id, { status: "credited", txHash: hash });
     return NextResponse.json({ ok: true, txHash: hash });
   } catch (err) {
