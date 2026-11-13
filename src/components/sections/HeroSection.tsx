@@ -46,7 +46,7 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="container-wide w-full py-28 lg:py-0">
+      <div className="container-wide w-full py-28 lg:pt-32 lg:pb-0">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-6 items-center min-h-screen">
           {/* Left, text content */}
           <motion.div
@@ -107,9 +107,9 @@ export function HeroSection() {
                 border border-emerald/25 bg-emerald/8">
                 <div className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
                 <span className="text-emerald-dark text-sm font-medium">
-                  Round 1 opens <strong className="text-ink">September 21, 2026</strong>
+                  Round 1 opens <strong className="text-ink">December 7, 2026</strong>
                   <span className="text-ink/40 mx-2">·</span>
-                  Round 2 opens <strong className="text-ink">December 21, 2026</strong>
+                  Round 2 opens <strong className="text-ink">March  7, 2026</strong>
                 </span>
               </div>
             </motion.div>
@@ -117,7 +117,7 @@ export function HeroSection() {
             {/* Stats row */}
             <motion.div variants={itemVariants} className="flex flex-wrap gap-6 mt-10 pt-8 border-t border-ink/10">
               {[
-                { label: "Presale Supply", value: "1.5B MMC" },
+                { label: "Presale Supply", value: "2B MMC" },
                 { label: "Blockchain", value: "Ethereum" },
                 { label: "Token Standard", value: "ERC-20" },
               ].map((stat) => (

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createPublicClient, http, isAddress, parseAbi, parseUnits } from "viem";
-import { sepolia } from "viem/chains"; // change to your chain
-import { db } from "@/server/db"; // YOUR database helper (see notes)
+import { sepolia } from "viem/chains";
+import { db } from "@/server/db";
 
 const PRESALE = process.env.PRESALE_ADDRESS as `0x${string}`;
-const MIN_USD_CENTS = 1000n; // $10 minimum, change as you like
+const MIN_USD_CENTS = 1000n;
 
 const client = createPublicClient({ chain: sepolia, transport: http(process.env.RPC_URL) });
 const abi = parseAbi(["function currentPrice() view returns (uint256)"]);
