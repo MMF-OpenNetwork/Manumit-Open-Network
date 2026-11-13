@@ -1,6 +1,6 @@
 import { getDefaultConfig, type Wallet, type WalletList } from "@rainbow-me/rainbowkit";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
-import { createConnector } from "wagmi";
+import { createConnector, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { activeChain } from "@/lib/chain";
 
@@ -71,5 +71,9 @@ export const wagmiConfig = getDefaultConfig({
   projectId,
   wallets,
   chains: [activeChain],
+  transports: {
+  [activeChain.id]: http(process.env.NEXT_PUBLIC_RPC_URL),
+},
   ssr: true,
 });
+
