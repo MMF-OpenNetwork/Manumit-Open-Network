@@ -207,7 +207,7 @@ export default function ContactPage() {
                     </span>
                   </div>
                   <p className="text-ink font-semibold mb-1">Presale Round 1</p>
-                  <p className="text-gold font-display font-bold text-xl mb-3">September 21, 2026</p>
+                  <p className="text-gold font-display font-bold text-xl mb-3">December 7, 2026</p>
                   <p className="text-ink/60 text-xs">Round 2 opens December 21, 2026</p>
                 </div>
 

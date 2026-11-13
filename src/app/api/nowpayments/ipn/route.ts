@@ -9,10 +9,9 @@ import {
   toHex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains"; // change to your chain
-import { db } from "@/server/db"; // YOUR database helper (see notes)
+import { activeChain } from "@/lib/chain";
+import { db } from "@/server/db";
 
-// Allow time for the blockchain transaction (check your hosting plan's limit).
 export const maxDuration = 60;
 
 const PRESALE = process.env.PRESALE_ADDRESS as `0x${string}`;
@@ -27,7 +26,7 @@ const abi = parseAbi([
   "function recordOffchainPurchase(address buyer, uint256 paymentAmountUsd6, bytes32 paymentId, uint256 paidAt, uint256 minMmcOut)",
 ]);
 
-const publicClient = createPublicClient({ chain: sepolia, transport: http(process.env.RPC_URL) });
+const publicClient = createPublicClient({ chain: activeChain, transport: http(process.env.RPC_URL) });
 
 // NOWPayments signs the JSON body with its keys sorted alphabetically.
 function sortKeys(value: unknown): unknown {
@@ -118,7 +117,7 @@ export async function POST(req: Request) {
     });
 
     const account = privateKeyToAccount(process.env.PROCESSOR_PRIVATE_KEY as `0x${string}`);
-    const wallet = createWalletClient({ account, chain: sepolia, transport: http(process.env.RPC_URL) });
+    const wallet = createWalletClient({ account, chain: activeChain, transport: http(process.env.RPC_URL) });
 
     const hash = await wallet.writeContract({
       address: PRESALE,

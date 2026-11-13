@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createPublicClient, http, isAddress, parseAbi, parseUnits } from "viem";
-import { sepolia } from "viem/chains";
+import { activeChain } from "@/lib/chain";
 import { db } from "@/server/db";
 
 const PRESALE = process.env.PRESALE_ADDRESS as `0x${string}`;
 const MIN_USD_CENTS = 1000n;
 
-const client = createPublicClient({ chain: sepolia, transport: http(process.env.RPC_URL) });
+const client = createPublicClient({ chain: activeChain, transport: http(process.env.RPC_URL) });
 const abi = parseAbi(["function currentPrice() view returns (uint256)"]);
 
 export async function POST(req: Request) {
@@ -20,7 +20,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  // The price ALWAYS comes from the contract, never from the browser.
   let price6: bigint;
   try {
     price6 = await client.readContract({ address: PRESALE, abi, functionName: "currentPrice" });

@@ -3,8 +3,8 @@
  *
  *   Sepolia  MMC token : 0x892d8FcAA3539191662918eB22E9f99Ca8478B16
  *            Presale   : 0x5AB51E9f88cEB680a64D9F887F6614A9d5e1fbb7
- *   Mainnet  MMC token : 0xc712dd47a3370d2787260a1b487b8c61dbabf382
- *            Presale   : 0x6d1d8787849d93044943d678e2e864017de65701
+ *   Mainnet  MMC token : 00xBbCfE6803D40F410216E2aBEB6584Dbcf84d11aF
+ *            Presale   : 0x9b6f86e21410e40f4E38D195AD35A157098660b8
  *
  * Both contracts are verified on Etherscan; the shape of the ABI in
  * src/lib/presaleABI.json is the source of truth for every read and write the
@@ -79,8 +79,8 @@ interface NetworkConfig {
 }
 
 const MAINNET: NetworkConfig = {
-  token: "0x599ca79738be6a9f7c0ef982ad3bb8fc558f1a17",
-  presale: "0xEFA09E829DAd58B1A4Cab8EEfBb7a5006d4BfA9a",
+  token: "0xBbCfE6803D40F410216E2aBEB6584Dbcf84d11aF",
+  presale: "0x9b6f86e21410e40f4E38D195AD35A157098660b8",
   explorer: "https://etherscan.io",
   unlockDate: "2028-07-09T00:00:00Z",
   rounds: [
